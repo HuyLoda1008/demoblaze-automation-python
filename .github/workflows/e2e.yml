@@ -1,0 +1,161 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: mypy .
+      - run: ruff check .
+      - run: python scripts/check_pom_boundary.py
+      - run: ruff format --check .
+      - run: pytest tests/unit
+
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      BASE_URL: https://www.demoblaze.com
+      API_BASE_URL: https://api.demoblaze.com
+      TEST_USER: ${{ secrets.DEMOBLAZE_TEST_USER }}
+      TEST_PASSWORD: ${{ secrets.DEMOBLAZE_TEST_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: playwright install --with-deps
+      - run: pytest -m smoke --reruns 1 --reruns-delay 2 --junitxml=reports/junit.xml --html=reports/html/index.html --self-contained-html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-smoke
+          path: reports/
+          retention-days: 14
+
+  full-suite:
+    name: full-suite (shard ${{ matrix.shard }}/3)
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+    needs: smoke
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      BASE_URL: https://www.demoblaze.com
+      API_BASE_URL: https://api.demoblaze.com
+      TEST_USER: ${{ secrets.DEMOBLAZE_TEST_USER }}
+      TEST_PASSWORD: ${{ secrets.DEMOBLAZE_TEST_PASSWORD }}
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: playwright install --with-deps
+      - run: >
+          pytest --browser chromium --browser firefox --browser webkit
+          --splits 3 --group ${{ matrix.shard }}
+          --junitxml=reports/junit-shard-${{ matrix.shard }}.xml
+          --html=reports/html-shard-${{ matrix.shard }}/index.html --self-contained-html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shard-report-${{ matrix.shard }}
+          path: reports/
+          retention-days: 14
+
+  merge-reports:
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    needs: full-suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shard-report-*
+          path: all-shard-reports
+          merge-multiple: false
+      - run: |
+          mkdir -p reports/html
+          junitparser merge all-shard-reports/*/junit-shard-*.xml reports/junit.xml
+          python -m pytest_html_merger -i all-shard-reports -o reports/html -t "full-suite report"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-full
+          path: reports/
+          retention-days: 14
+
+  publish-report:
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: merge-reports
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: playwright-report-full
+          path: reports-full
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: reports-full/html
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  publish-image:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

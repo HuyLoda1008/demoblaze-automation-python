@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demoblaze-test-config
+data:
+  # DemoBlaze has exactly one real environment -- see config/environments.py.
+  # The testing/staging/production split below is about run cadence and
+  # marker selection (how often, which subset), not separate DemoBlaze
+  # targets.
+  TEST_ENV: demoblaze_prod
+  BASE_URL: https://www.demoblaze.com
+  API_BASE_URL: https://api.demoblaze.com
+  # pytest-xdist's `-n auto` sizes workers off detected CPU count, not the
+  # pod's memory limit -- the same root cause that OOM-killed the
+  # TypeScript sibling's pod at 1Gi before CI-gating the worker cap. This
+  # flag is read by a wrapper in the CronJob args (see cronjob.yaml).
+  CI: 'true'

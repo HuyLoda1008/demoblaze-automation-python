@@ -1,0 +1,45 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `tests/` has no __init__.py (deliberate -- rootless test collection), so
+# pytest's default import mode prepends each test file's own directory to
+# sys.path, NOT the repo root. Without this, `from config.environments
+# import ...` / `from src... import ...` only resolve when invoked as
+# `python -m pytest` (which separately puts cwd on sys.path) and fail under
+# a bare `pytest` invocation -- exactly what `make test-*` uses.
+pythonpath = ["."]
+# Global safety net on top of any per-class @pytest.mark.timeout(N): a
+# single hung test (e.g. a stalled network call to the live, uncontrolled
+# DemoBlaze site) must not be able to block a run indefinitely. --timeout-
+# method=thread is used because the default signal-based method isn't
+# reliably delivered while blocked deep inside a C-level/greenlet-switching
+# call (verified live: a real run once sat at ~98% CPU for hours past its
+# class-level 60s timeout before being killed manually).
+addopts = "--strict-markers --timeout=120 --timeout-method=thread"
+markers = [
+    "smoke: fast, must-pass-on-every-PR subset",
+    "regression: broader negative/edge coverage, not required every push",
+    "auth: touches login/signup/logout",
+    "cart: touches cart/checkout",
+    "api: tests/api/**, no browser",
+    "perf: tests/performance/**, navigation-timing checks",
+    "a11y: tests/accessibility/**, axe-core checks",
+]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+exclude = ["test-cases/generate_xlsx.py"]
+
+[[tool.mypy.overrides]]
+module = "openpyxl.*"
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py39"
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
