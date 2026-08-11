@@ -38,7 +38,7 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: playwright install --with-deps
       - run: pytest -m smoke --reruns 1 --reruns-delay 2 --junitxml=reports/junit.xml --html=reports/html/index.html --self-contained-html
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report-smoke
@@ -73,7 +73,7 @@ jobs:
           --splits 3 --group ${{ matrix.shard }}
           --junitxml=reports/junit-shard-${{ matrix.shard }}.xml
           --html=reports/html-shard-${{ matrix.shard }}/index.html --self-contained-html
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: shard-report-${{ matrix.shard }}
@@ -100,7 +100,7 @@ jobs:
           mkdir -p reports/html
           junitparser merge all-shard-reports/*/junit-shard-*.xml reports/junit.xml
           python -m pytest_html_merger -i all-shard-reports -o reports/html -t "full-suite report"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report-full
