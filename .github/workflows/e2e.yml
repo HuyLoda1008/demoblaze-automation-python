@@ -127,7 +127,7 @@ jobs:
         with:
           path: reports-full/html
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   publish-image:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
