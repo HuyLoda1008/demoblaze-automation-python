@@ -1,4 +1,4 @@
-.PHONY: help install test test-smoke test-regression test-api test-perf test-a11y test-unit test-headed report gen-testcases typecheck lint format-check demo
+.PHONY: help install test test-smoke test-regression test-api test-perf test-a11y test-unit test-headed test-rerun-failed report gen-testcases typecheck lint format-check demo
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -31,6 +31,10 @@ test-unit: ## Pure-logic unit tests, no browser
 
 test-headed: ## Any of the above with --headed for local debugging
 	pytest --headed
+
+test-rerun-failed: ## Re-run only the tests that failed last run (reports/failed_tests.log)
+	@test -s reports/failed_tests.log || (echo "No reports/failed_tests.log -- run a suite first" && exit 1)
+	pytest -k "$$(cat reports/failed_tests.log)"
 
 report: ## Open the last HTML report
 	open reports/html/index.html

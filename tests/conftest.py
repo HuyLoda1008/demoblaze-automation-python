@@ -1,7 +1,9 @@
 import logging
+from pathlib import Path
 from typing import Generator
 
 import pytest
+from _pytest.terminal import TerminalReporter
 from playwright.sync_api import APIRequestContext, Page, Playwright
 
 from config.environments import EnvConfig, get_env_config
@@ -12,6 +14,29 @@ from src.pages.product.product_detail_page import ProductDetailPage
 from src.utils.api_client import DemoblazeApiClient
 
 logger = logging.getLogger(__name__)
+
+# Mirrors bumblebee's `download/!failed_tests.log`: after a run with
+# failures, this holds a ready-to-paste `-k` expression so a failing subset
+# can be re-triggered without re-running the whole suite. Deliberately a
+# flat file, not pytest's own --lf cache -- this one survives being copied
+# out of a CI artifact and pasted into a fresh `pytest -k "..."` invocation
+# on a different machine (see `make test-rerun-failed`).
+FAILED_TESTS_LOG = Path('reports/failed_tests.log')
+
+
+def pytest_sessionstart() -> None:
+    FAILED_TESTS_LOG.parent.mkdir(parents=True, exist_ok=True)
+    FAILED_TESTS_LOG.unlink(missing_ok=True)
+
+
+def pytest_terminal_summary(terminalreporter: TerminalReporter) -> None:
+    failed_reports = terminalreporter.stats.get('failed', []) + terminalreporter.stats.get('error', [])
+    if not failed_reports:
+        return
+    # Keep only the test function name (last `::` segment) so the -k
+    # expression matches regardless of which file/class it lives in.
+    test_names = sorted({report.nodeid.split('::')[-1] for report in failed_reports})
+    FAILED_TESTS_LOG.write_text(' or '.join(test_names))
 
 
 @pytest.fixture(scope='session')

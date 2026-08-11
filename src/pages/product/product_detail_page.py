@@ -1,12 +1,14 @@
 from playwright.sync_api import Page, expect
 
 from src.pages.base_page import BasePage
+from src.pages.components.nav_bar import NavBar
 from src.utils.dialog_handler import with_dialog
 
 
 class ProductDetailPage(BasePage):
     def __init__(self, page: Page) -> None:
         super().__init__(page)
+        self.nav_bar = NavBar(page)
         self.add_to_cart_link = page.get_by_role('link', name='Add to cart')
         self.product_title = page.locator('.product-content h2.name')
         self.product_price = page.locator('.product-content h3.price-container')

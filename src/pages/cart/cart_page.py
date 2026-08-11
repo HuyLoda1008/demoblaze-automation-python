@@ -5,6 +5,7 @@ from playwright.sync_api import Page, expect
 
 from src.pages.base_page import BasePage
 from src.pages.checkout.order_modal_page import OrderModalPage
+from src.pages.components.nav_bar import NavBar
 
 
 @dataclass
@@ -26,6 +27,7 @@ _GET_ROWS_JS = """
 class CartPage(BasePage):
     def __init__(self, page: Page) -> None:
         super().__init__(page)
+        self.nav_bar = NavBar(page)
         self.rows = page.locator('#tbodyid tr')
         # Must be role-based -- a bare text=Place Order locator ambiguously
         # matches the order modal's own "Place order" heading (Playwright

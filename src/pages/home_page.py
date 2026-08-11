@@ -3,16 +3,20 @@ from playwright.sync_api import Page, expect
 from src.pages.auth.login_modal_page import LoginModalPage
 from src.pages.auth.signup_modal_page import SignupModalPage
 from src.pages.base_page import BasePage
+from src.pages.components.nav_bar import NavBar
 
 
 class HomePage(BasePage):
     def __init__(self, page: Page) -> None:
         super().__init__(page)
-        self.login_nav_link = page.locator('#login2')
-        self.signup_nav_link = page.locator('#signin2')
-        self.logout_nav_link = page.locator('#logout2')
-        self.welcome_label = page.locator('#nameofuser')
-        self.cart_nav_link = page.locator('#cartur')
+        self.nav_bar = NavBar(page)
+        # Aliased for backward compatibility with existing call sites
+        # (tests reach these directly, e.g. `home_page.welcome_label`).
+        self.login_nav_link = self.nav_bar.login_nav_link
+        self.signup_nav_link = self.nav_bar.signup_nav_link
+        self.logout_nav_link = self.nav_bar.logout_nav_link
+        self.welcome_label = self.nav_bar.welcome_label
+        self.cart_nav_link = self.nav_bar.cart_nav_link
         self.product_cards = page.locator('.card')
 
         self.login_modal = LoginModalPage(page)
@@ -42,14 +46,10 @@ class HomePage(BasePage):
         expect(self.signup_modal.username_input).to_be_visible()
 
     def is_logged_in(self) -> bool:
-        if not self.logout_nav_link.is_visible():
-            return False
-        text = self.welcome_label.inner_text()
-        return text.startswith('Welcome')
+        return self.nav_bar.is_logged_in()
 
     def logout(self, timeout_ms: int = 5_000) -> None:
-        # Called from fixture teardown -- must not burn the test's timeout budget.
-        self.logout_nav_link.click(timeout=timeout_ms)
+        self.nav_bar.logout(timeout_ms)
 
     def get_product_names(self) -> list[str]:
         return self.page.locator('.card-title a.hrefch').all_inner_texts()

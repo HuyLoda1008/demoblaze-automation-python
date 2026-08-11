@@ -37,6 +37,7 @@ make test-unit         # pure-logic unit tests (pydantic schemas, env config)
 make test-perf         # navigation-timing smoke checks
 make test-a11y         # axe-core accessibility checks (Home/Product/Cart)
 make test-headed       # any of the above with --headed for local debugging
+make test-rerun-failed # re-run only what failed last run (reports/failed_tests.log)
 make report            # open the last HTML report
 make gen-testcases     # regenerate test-cases/test-cases.xlsx
 make typecheck         # mypy --strict
@@ -54,6 +55,7 @@ config/
 src/
   pages/                 # Page Object Model
     base_page.py         # thin base -- defers to Playwright's own auto-waiting expect()
+    components/nav_bar.py  # site-wide header, composed into every page (self.nav_bar = NavBar(page))
     home_page.py           auth/login_modal_page.py   auth/signup_modal_page.py
     product/product_detail_page.py
     cart/cart_page.py      checkout/order_modal_page.py
@@ -92,6 +94,22 @@ live in `config/env/prod.env` (gitignored) and as GitHub Actions secrets in CI.
   DemoBlaze's own `POST /deletecart` as a side effect.
 - **Login session**: the `home_page` fixture logs out automatically in
   teardown if the test ends still authenticated.
+
+## Re-running failures
+
+Any run (local or CI) that has failures writes `reports/failed_tests.log` --
+a `-k`-ready expression naming just the failed tests (via a
+`pytest_terminal_summary` hook in `tests/conftest.py`). To re-run only those:
+
+```bash
+make test-rerun-failed
+```
+
+This is a flat file rather than pytest's built-in `--lf` cache because it
+survives being pulled out of a CI artifact and reused on a different
+machine/checkout -- e.g. copy `reports/failed_tests.log` out of a GitHub
+Actions run's uploaded `reports/` artifact and run `make test-rerun-failed`
+locally against the same failing subset.
 
 ## Known site quirks (see CODE_CONVENTIONS.md and inline comments)
 
