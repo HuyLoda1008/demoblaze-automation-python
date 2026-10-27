@@ -1,6 +1,6 @@
 # Base image tag must match the `playwright` pip version pinned in
 # requirements.txt -- same discipline as the TypeScript sibling image.
-FROM mcr.microsoft.com/playwright/python:v1.48.0-noble
+FROM mcr.microsoft.com/playwright/python:v1.64.1-noble
 
 WORKDIR /app
 
